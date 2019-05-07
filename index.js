@@ -1,36 +1,35 @@
-const fs = require("fs");
-const express = require("express");
-const app = express();
-app.use(express.urlencoded({ extended: false }));
-app.use("/public/js", express.static("js"));
+const osmosis = require( "osmosis" ), fs = require( "fs" ),
 
-app.get("/*", function(req, res) {
-  if (req.url.startsWith("/public/")) {
-    var filePath = req.url.substr(1);
-    fs.readFile(filePath, function(error, data) {
-      if (error) {
-        f404(res);
-      } else {
-        res.end(data);
-      }
+        MongoClient = require( "mongodb" ).MongoClient,
+        url = "mongodb://localhost:27017/",
+        mongoClient = new MongoClient( url, { useNewUrlParser: true });         // create host connection
+
+var json = {}, element = {}, i = 0;
+
+osmosis
+    .get( "https://www.winnerauto.ua/cars/all_cars/" )                          // request to http(s)://...
+    .find( ".goodsBlock" )                                                      // find needed class
+    .set({
+        name: ".link-goods", price: ".price-container b"                        // create needed item via classes
+                    
+    })
+    .data(( data ) => {                                                         // work with on data
+        json[ "vehicle_" + i ] = { name: data.name, price: data.price }; i++;
+    })
+    .done( () => {
+        fs.writeFileSync( "data.json", JSON.stringify( json ), ( err ) => {     // write data to needed file
+            if ( err ) throw err;                             
+        });
+
+        mongoClient.connect(( err, client ) => {                                // write data to mongodb
+            if ( err ) { throw err } 
+            else {
+                const db = client.db( "NewDB" );
+                const collection = db.collection( "post" );
+                collection.insertOne( json, function( err, result ) {
+                    if ( err ) throw err;
+                    client.close();
+                });
+            }
+        });
     });
-  } else {
-    f404(res);
-  }
-});
-
-app.post("/index", function(req, res) {
-  console.log(req.body);
-
-  fs.writeFileSync("./public/data.json", JSON.stringify(req.body), err => {
-    if (err) console.log(err);
-    console.log("Successfully Written to File.");
-  });
-  res.status(200).send(req.body);
-});
-app.listen(3000);
-
-function f404(res) {
-  res.statusCode = 404;
-  res.end("404: Not Found!");
-}
